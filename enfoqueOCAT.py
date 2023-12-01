@@ -186,36 +186,49 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
         
     print(clausulaGeneral)
 
-noFilas = 10
+# noFilas = 10
 
-columna_1 = [str(random.uniform(0, 3)) for _ in range(noFilas)]
-columna_2 = [str(random.uniform(0, 3)) for _ in range(noFilas)]
-columna_3 = [str(random.randint(0, 1)) for _ in range(noFilas)]
+# columna_1 = [str(random.uniform(0, 3)) for _ in range(noFilas)]
+# columna_2 = [str(random.uniform(0, 3)) for _ in range(noFilas)]
+# columna_3 = [str(random.randint(0, 1)) for _ in range(noFilas)]
 
-columna_1 = [0,1,0,1,1,0,1,0,1,1]
-columna_2 = [1,1,0,0,0,0,1,0,0,1]
-columna_3 = [0,0,1,0,1,0,1,0,0,1]
-columna_4 = [0,0,1,1,0,1,1,0,0,0]
-columna_5 = [1,1,1,1,0,0,0,0,0,0]
+# columna_1 = [0,1,0,1,1,0,1,0,1,1]
+# columna_2 = [1,1,0,0,0,0,1,0,0,1]
+# columna_3 = [0,0,1,0,1,0,1,0,0,1]
+# columna_4 = [0,0,1,1,0,1,1,0,0,0]
+# columna_5 = [1,1,1,1,0,0,0,0,0,0]
 
 # data = {"x_1": columna_1, "x_2": columna_2, "target": columna_3}
 # df = pd.DataFrame(data)
 
 # Convertir las listas de enteros a listas de strings
-columna_1_str = [str(x) for x in columna_1]
-columna_2_str = [str(x) for x in columna_2]
-columna_3_str = [str(x) for x in columna_3]
-columna_4_str = [str(x) for x in columna_4]
-columna_5_str = [str(x) for x in columna_5]
+# columna_1_str = [str(x) for x in columna_1]
+# columna_2_str = [str(x) for x in columna_2]
+# columna_3_str = [str(x) for x in columna_3]
+# columna_4_str = [str(x) for x in columna_4]
+# columna_5_str = [str(x) for x in columna_5]
 
 # Crear un DataFrame con esas columnas como strings
-df = pd.DataFrame({
-    'x_1': columna_1_str,
-    'x_2': columna_2_str,
-    'x_3': columna_3_str,
-    'x_4': columna_4_str,
-    'target': columna_5_str
-})
+# df = pd.DataFrame({
+#     'x_1': columna_1_str,
+#     'x_2': columna_2_str,
+#     'x_3': columna_3_str,
+#     'x_4': columna_4_str,
+#     'target': columna_5_str
+# })
+
+# Crear un DataFrame vacío con 6 columnas
+num_columnas = 6
+nombres_columnas = ["target"]
+
+for i in range(1, num_columnas + 1):
+    nombres_columnas.append(f"x_{i}")
+
+df = pd.read_csv('monk+s+problems/monks-1.train', header=None, sep='\s+', names=nombres_columnas, index_col=False)
+
+print(df)
+
+# df.columns = nombres_columnas
 
 # Mostrar el DataFrame resultante
 print(df)
@@ -223,8 +236,10 @@ print(df)
 columnTarget = 'target'
 target = '1'
 
-# dfBinarizado = binarizacion(df, columnTarget)
-enfoqueOCAT(df, columnTarget, target)
+dfBinarizado = binarizacion(df, columnTarget)
+print(dfBinarizado)
+dfBinarizado.to_csv('monk-1-train.csv')
+# enfoqueOCAT(dfBinarizado, columnTarget, target)
 
 
 
