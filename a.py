@@ -1,38 +1,31 @@
 import pandas as pd
 
-# Crear el DataFrame con los datos proporcionados
-data = {
-    'x_1': [1, 0, 1, 0, 1, 1],
-    'x_2': [0, 0, 1, 0, 0, 1],
-    'x_3': [1, 0, 1, 0, 0, 1],
-    'x_4': [0, 1, 1, 0, 0, 0],
-    'target': [0, 0, 0, 0, 0, 0]
-}
-df = pd.DataFrame(data)
+num_columnas = 6
+nombres_columnas = ["target"]
 
-# Supongamos que tienes una expresión de disyunción como un string
-expresion_disyuncion = "x_2 v x_4"
+for i in range(1, num_columnas + 1):
+    nombres_columnas.append(f"x_{i}")
 
-# Convertir la expresión de disyunción a una lista de componentes
-componentes_disyuncion = expresion_disyuncion.split(' v ')
-
-# Función para evaluar la expresión de disyunción en el DataFrame
-def evaluar_expresion_disyuncion(fila, componentes_disyuncion):
-    for componente in componentes_disyuncion:
-        negacion = componente.startswith('neg_')
-        col = componente[4:] if negacion else componente
-        
-        if negacion:
-            if fila[col] != 1:
-                return True  # Si la negación no se cumple, retorna True
-        else:
-            if fila[col] == 1:
-                return False  # Si alguna columna normal cumple, retorna False
-    
-    return True  # Si ninguna condición se cumple, retorna True (no se cumple la disyunción)
-
-# Filtrar el DataFrame aplicando la función de expresión de disyunción a cada fila
-df_no_cumple_disyuncion = df[~df.apply(evaluar_expresion_disyuncion, axis=1, componentes_disyuncion=componentes_disyuncion)]
+df = pd.read_csv('monk+s+problems/monks-2.train', header=None, sep='\s+', names=nombres_columnas, index_col=False)
+df.columns = nombres_columnas
 
 # Mostrar el DataFrame resultante
-print(df_no_cumple_disyuncion)
+print(df)
+df.drop(df.columns[0], axis=1)
+
+df.to_csv('monk-2-train.csv')
+
+# Obtener el nombre de la primera columna
+primera_columna = df.columns[0]
+
+print(df.columns)
+
+
+# Reorganizar las columnas: la primera columna al final
+columnas_reordenadas = list(df.columns[1:]) + [primera_columna]
+
+# Crear un nuevo DataFrame con las columnas reordenadas
+df_reordenado = df[columnas_reordenadas]
+
+# Guardar el DataFrame resultante como un nuevo archivo CSV
+df_reordenado.to_csv('monk-2-train.csv', index=False)

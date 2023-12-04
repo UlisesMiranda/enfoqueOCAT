@@ -33,7 +33,6 @@ def binarizacion(df: pd.DataFrame, columnTarget):
         for j, atributo in enumerate(atributosColumna):
             dfBinarizado.at[j, col] = codificarBinario(atributo, listaValores)
     
-    print(dfBinarizado)
     nuevasColumnas = []
     for col in columnas:
         nuevasColumnas.append(dividirEnColumnas(dfBinarizado, col))
@@ -41,9 +40,28 @@ def binarizacion(df: pd.DataFrame, columnTarget):
     dfBinarizado = pd.concat(nuevasColumnas, axis=1)
     dfBinarizado[columnTarget] = df[columnTarget]
     
-    print(dfBinarizado)
-    
     return dfBinarizado
+
+def oneHot(df):
+    last_column_name = df.columns[-1]  # Obtener el nombre de la última columna
+    columns_to_encode = df.columns[:-1]  # Seleccionar todas las columnas excepto la última
+    new_df = pd.DataFrame()  # Crear un nuevo DataFrame para almacenar las columnas codificadas
+
+    for idx, columna in enumerate(columns_to_encode):
+        valores_unicos = df[columna].unique()
+
+        for valor in valores_unicos:
+            nueva_columna = []
+            for fila in df[columna]:
+                if fila == valor:
+                    nueva_columna.append(1)
+                else:
+                    nueva_columna.append(0)
+            new_df[f'x_{idx+1}_{valor}'] = nueva_columna  # Agregar nuevas columnas con nombres 'x_1_1', 'x_1_2', etc.
+    
+    new_df[last_column_name] = df[last_column_name]  # Agregar la última columna original al nuevo DataFrame
+    
+    return new_df
 
 def indicesPositivosAndNegativos(columna: np.array, target):
     pos = np.where(columna == target)
@@ -117,23 +135,27 @@ def actualizarEspacioPositivo(espacioPositivo: pd.DataFrame, columna, target, es
     else:
         return espacioPositivo[espacioPositivo[columna] != target]
 
-def evaluar_expresion_disyuncion(fila, componentes_disyuncion):
-    for componente in componentes_disyuncion:
-        negacion = componente.startswith('neg_')
-        col = componente[4:] if negacion else componente
-        
-        if negacion:
-            if fila[col] != '1':
-                return True  # Si la negación no se cumple, retorna True
-        else:
-            if fila[col] == '1':
-                return False  # Si alguna columna normal cumple, retorna False
+def evaluar_expresion_disyuncion(fila, expresion):
+    expresion_components = expresion.split(' V ')[:-1]
+    for componente in expresion_components:
+        negacion = False
+        col_name = componente
+
+        if componente.startswith('neg_'):
+            col_name = componente[4:]
+            negacion = True
+
+        col_value = fila[col_name]
+        if (not negacion and col_value == '1') or (negacion and col_value == '0'):
+            return True
     
-    return True
+    return False
 
 def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
     columnas = list(df.columns)
     columnas.remove(columnTarget)
+    
+    df = df.iloc[ df.shape[0] // 2 :, :]
     
     conceptosPositivos = df[df[columnTarget] == target]
     conceptosNegativos =  df[df[columnTarget] != target]
@@ -149,20 +171,51 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
     clausulaGeneral = []
     while not conceptosNegativosActual.empty:
         clausula = ''
-        while not conceptosPositivosActual.empty:
-            positivosAceptados, positivosAceptadosNegados = obtenerIndices(conceptosPositivosActual, columnas, target)
-            negativosAceptados, negativosAceptadosNegados = obtenerIndices(conceptosNegativosActual, columnas, target)
+        isListaInicial = True
+        terminoRandom = ''
+        columnasEvaluacion = columnas.copy()
+        while not conceptosPositivosActual.empty:                
+            
+            if (isListaInicial):
+                positivosAceptados, positivosAceptadosNegados = obtenerIndices(conceptosPositivosActual, columnasEvaluacion, target)
+                negativosAceptados, negativosAceptadosNegados = obtenerIndices(conceptosNegativosActual, columnasEvaluacion, target)
+                
+                positivosAceptadosMagnitud = calcularMagnitud(positivosAceptados)
+                positivosAceptadosNegadosMagnitud = calcularMagnitud(positivosAceptadosNegados)
+                negativosAceptadosMagnitud = calcularMagnitud(negativosAceptados)
+                negativosAceptadosNegadosMagnitud = calcularMagnitud(negativosAceptadosNegados)
+                
+                isListaInicial = False
+                aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnasEvaluacion)
+                mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
+            else:
+                if terminoRandom != '':
+                    terminoRandomCopy = terminoRandom
+                    if terminoRandom.startswith('neg_'):
+                        terminoRandomCopy = terminoRandom[4:]
                         
-            positivosAceptadosMagnitud = calcularMagnitud(positivosAceptados)
-            positivosAceptadosNegadosMagnitud = calcularMagnitud(positivosAceptadosNegados)
-            negativosAceptadosMagnitud = calcularMagnitud(negativosAceptados)
-            negativosAceptadosNegadosMagnitud = calcularMagnitud(negativosAceptadosNegados)
+                    positivosAceptados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, positivosAceptados))      
+                    positivosAceptadosNegados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, positivosAceptadosNegados))      
+                    negativosAceptados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, negativosAceptados))      
+                    negativosAceptadosNegados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, negativosAceptadosNegados))
+                    
+                    columnasEvaluacion.remove(terminoRandomCopy) 
+                    
+                    positivosAceptadosMagnitud = calcularMagnitud(positivosAceptados)
+                    positivosAceptadosNegadosMagnitud = calcularMagnitud(positivosAceptadosNegados)
+                    negativosAceptadosMagnitud = calcularMagnitud(negativosAceptados)
+                    negativosAceptadosNegadosMagnitud = calcularMagnitud(negativosAceptadosNegados)     
             
-            aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, 
-                                                    negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnas)
-            
-            mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
-            terminoRandom = obtenerElementoRandom(mejorSubconjunto)
+            if mejorSubconjunto:
+                terminoRandom = obtenerElementoRandom(mejorSubconjunto)
+                mejorSubconjunto.remove(terminoRandom)
+            else:
+                aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnasEvaluacion)
+                mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
+                # mejorSubconjunto.remove(terminoRandom)
+                terminoRandom = obtenerElementoRandom(mejorSubconjunto)
+                mejorSubconjunto.remove(terminoRandom)
+                
             
             if not (conceptosPositivosActual.empty):
                 clausula += terminoRandom + ' V '
@@ -175,41 +228,39 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
             else:
                 conceptosPositivosActual = actualizarEspacioPositivo(conceptosPositivosActual, terminoRandom, target, False)  
 
-        columnasHipotesis = clausula.split(' V ')[:-1]
+        print("Conceptos positivios")
+        print(conceptosPositivos)
         
+        print("Conceptos neg ac")
         print(conceptosNegativosActual)
-        conceptosNegativosActual = conceptosNegativosActual[~conceptosNegativosActual.apply(evaluar_expresion_disyuncion, axis=1, componentes_disyuncion=columnasHipotesis)]
+
+        conceptosNegativosActual = conceptosNegativosActual[conceptosNegativosActual.apply(lambda x: evaluar_expresion_disyuncion(x, clausula), axis=1)]
+        
+        print("Conceptos neg nuevs")
         print(conceptosNegativosActual)
             
         conceptosPositivosActual = conceptosPositivos
-        clausulaGeneral.append(clausula)
+        clausulaGeneral.append(clausula[:-3])
+        # print(clausulaGeneral)
         
     print(clausulaGeneral)
 
-# noFilas = 10
 
-# columna_1 = [str(random.uniform(0, 3)) for _ in range(noFilas)]
-# columna_2 = [str(random.uniform(0, 3)) for _ in range(noFilas)]
-# columna_3 = [str(random.randint(0, 1)) for _ in range(noFilas)]
-
+# PRUEBA DE DATOS
 # columna_1 = [0,1,0,1,1,0,1,0,1,1]
 # columna_2 = [1,1,0,0,0,0,1,0,0,1]
 # columna_3 = [0,0,1,0,1,0,1,0,0,1]
 # columna_4 = [0,0,1,1,0,1,1,0,0,0]
 # columna_5 = [1,1,1,1,0,0,0,0,0,0]
-
-# data = {"x_1": columna_1, "x_2": columna_2, "target": columna_3}
-# df = pd.DataFrame(data)
-
-# Convertir las listas de enteros a listas de strings
+# # # Convertir las listas de enteros a listas de strings
 # columna_1_str = [str(x) for x in columna_1]
 # columna_2_str = [str(x) for x in columna_2]
 # columna_3_str = [str(x) for x in columna_3]
 # columna_4_str = [str(x) for x in columna_4]
 # columna_5_str = [str(x) for x in columna_5]
 
-# Crear un DataFrame con esas columnas como strings
-# df = pd.DataFrame({
+# # Crear un DataFrame con esas columnas como strings
+# dfBinarizado = pd.DataFrame({
 #     'x_1': columna_1_str,
 #     'x_2': columna_2_str,
 #     'x_3': columna_3_str,
@@ -217,29 +268,56 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
 #     'target': columna_5_str
 # })
 
+
+
+# PRACTICA
 # Crear un DataFrame vacío con 6 columnas
-num_columnas = 6
-nombres_columnas = ["target"]
+# num_columnas = 6
+# nombres_columnas = ["target"]
 
-for i in range(1, num_columnas + 1):
-    nombres_columnas.append(f"x_{i}")
+# for i in range(1, num_columnas + 1):
+#     nombres_columnas.append(f"x_{i}")
 
-df = pd.read_csv('monk+s+problems/monks-1.train', header=None, sep='\s+', names=nombres_columnas, index_col=False)
-
-print(df)
-
+# df = pd.read_csv('monk+s+problems/monks-1.train', header=None, sep='\s+', names=nombres_columnas, index_col=False)
 # df.columns = nombres_columnas
 
-# Mostrar el DataFrame resultante
+# # Mostrar el DataFrame resultante
+# print(df)
+# df.drop(df.columns[0], axis=1)
+
+# df.to_csv('monk-1-train.csv')
+
+# # Obtener el nombre de la primera columna
+# primera_columna = df.columns[0]
+
+# print(df.columns)
+
+# # Reorganizar las columnas: la primera columna al final
+# columnas_reordenadas = list(df.columns[1:]) + [primera_columna]
+
+# # Crear un nuevo DataFrame con las columnas reordenadas
+# df_reordenado = df[columnas_reordenadas]
+
+# Guardar el DataFrame resultante como un nuevo archivo CSV
+# df.to_csv('monk-1-train.csv', index=False)
+
+df = pd.read_csv('monk-1-train.csv')
+df = df.astype(str)
 print(df)
 
-columnTarget = 'target'
+columnTarget = df.columns[-1]
 target = '1'
 
-dfBinarizado = binarizacion(df, columnTarget)
-print(dfBinarizado)
-dfBinarizado.to_csv('monk-1-train.csv')
-# enfoqueOCAT(dfBinarizado, columnTarget, target)
+dfBinarizado = oneHot(df)
+
+# dfBinarizado = binarizacion(df, columnTarget)
+# print(dfBinarizado)
+dfBinarizado = dfBinarizado.astype(str)
+# print(dfBinarizado.dtypes)
+# dfBinarizado.to_csv('monk-1-train.csv')
+enfoqueOCAT(dfBinarizado, columnTarget, target)
+
+# enfoqueOCAT(df, columnTarget, target)
 
 
 
