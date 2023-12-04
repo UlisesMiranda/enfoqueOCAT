@@ -57,9 +57,9 @@ def oneHot(df):
                     nueva_columna.append(1)
                 else:
                     nueva_columna.append(0)
-            new_df[f'x_{idx+1}_{valor}'] = nueva_columna  # Agregar nuevas columnas con nombres 'x_1_1', 'x_1_2', etc.
+            new_df[f'{columna}_{valor}'] = nueva_columna  # Agregar nuevas columnas con nombres 'x_1_1', 'x_1_2', etc.
     
-    new_df[last_column_name] = df[last_column_name]  # Agregar la última columna original al nuevo DataFrame
+    # new_df[last_column_name] = df[last_column_name]  # Agregar la última columna original al nuevo DataFrame
     
     return new_df
 
@@ -151,11 +151,28 @@ def evaluar_expresion_disyuncion(fila, expresion):
     
     return False
 
+def evaluar_expresion_conjuncion(fila, expresion):
+    expresion_components = expresion.split(' ^ ')[:-1]
+    for componente in expresion_components:
+        negacion = False
+        col_name = componente
+
+        if componente.startswith('neg_'):
+            col_name = componente[4:]
+            negacion = True
+
+        col_value = fila[col_name]
+        if(col_value) != '0':
+            print("")
+        if (not negacion and col_value != '1') or (negacion and col_value != '0'):
+            return False
+    
+    return True
+
+
 def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
     columnas = list(df.columns)
     columnas.remove(columnTarget)
-    
-    df = df.iloc[ df.shape[0] // 2 :, :]
     
     conceptosPositivos = df[df[columnTarget] == target]
     conceptosNegativos =  df[df[columnTarget] != target]
@@ -187,6 +204,9 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
                 
                 isListaInicial = False
                 aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnasEvaluacion)
+                
+                if not aptitudesResultantes:
+                    print("que shoe")
                 mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
             else:
                 if terminoRandom != '':
@@ -211,6 +231,8 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
                 mejorSubconjunto.remove(terminoRandom)
             else:
                 aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnasEvaluacion)
+                if not aptitudesResultantes:
+                    print("que shoe")
                 mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
                 # mejorSubconjunto.remove(terminoRandom)
                 terminoRandom = obtenerElementoRandom(mejorSubconjunto)
@@ -218,7 +240,7 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
                 
             
             if not (conceptosPositivosActual.empty):
-                clausula += terminoRandom + ' V '
+                clausula += terminoRandom + ' v '
             else:
                 clausula += terminoRandom 
             
@@ -235,6 +257,7 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
         print(conceptosNegativosActual)
 
         conceptosNegativosActual = conceptosNegativosActual[conceptosNegativosActual.apply(lambda x: evaluar_expresion_disyuncion(x, clausula), axis=1)]
+        # conceptosNegativosActual = conceptosNegativosActual[~conceptosNegativosActual.apply(lambda x: evaluar_expresion_conjuncion(x, clausula), axis=1)]
         
         print("Conceptos neg nuevs")
         print(conceptosNegativosActual)
@@ -246,7 +269,7 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
     print(clausulaGeneral)
 
 
-# PRUEBA DE DATOS
+# # PRUEBA DE DATOS
 # columna_1 = [0,1,0,1,1,0,1,0,1,1]
 # columna_2 = [1,1,0,0,0,0,1,0,0,1]
 # columna_3 = [0,0,1,0,1,0,1,0,0,1]
@@ -301,18 +324,39 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
 # Guardar el DataFrame resultante como un nuevo archivo CSV
 # df.to_csv('monk-1-train.csv', index=False)
 
+# PROBANDO
+
 df = pd.read_csv('monk-1-train.csv')
 df = df.astype(str)
 print(df)
 
-columnTarget = df.columns[-1]
+atributos = df.columns[:-1]
+lista_dataframes = []
+
+for atributo in atributos:
+    df_por_atributo = df[[atributo]].copy()
+    df_por_atributo[df.columns[-1]] = df[[df.columns[-1]]].copy()
+    
+    # print(df_por_atributo)
+    
+    df_bin_atributo = oneHot(df_por_atributo)
+    # print(df_bin_atributo)
+    
+    lista_dataframes.append(df_bin_atributo)
+    
+print(lista_dataframes)
+lista_dataframes.append(df[[df.columns[-1]]])
+    
+dfBinarizado =pd.concat(lista_dataframes, axis=1)
+print(dfBinarizado)
+
+# dfBinarizado = oneHot(df)
+# dfBinarizado = dfBinarizado.astype(str)
+
+columnTarget = dfBinarizado.columns[-1]
 target = '1'
-
-dfBinarizado = oneHot(df)
-
-# dfBinarizado = binarizacion(df, columnTarget)
-# print(dfBinarizado)
 dfBinarizado = dfBinarizado.astype(str)
+
 # print(dfBinarizado.dtypes)
 # dfBinarizado.to_csv('monk-1-train.csv')
 enfoqueOCAT(dfBinarizado, columnTarget, target)
