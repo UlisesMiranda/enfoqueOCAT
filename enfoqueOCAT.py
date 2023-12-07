@@ -411,8 +411,6 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
                 isListaInicial = False
                 aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnasEvaluacion)
                 
-                if not aptitudesResultantes:
-                    print("que shoe")
                 mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
             else:
                 if terminoRandom != '':
@@ -437,8 +435,7 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
                 mejorSubconjunto.remove(terminoRandom)
             else:
                 aptitudesResultantes: list = calculoAptitudes(positivosAceptadosMagnitud, positivosAceptadosNegadosMagnitud, negativosAceptadosMagnitud, negativosAceptadosNegadosMagnitud, columnasEvaluacion)
-                if not aptitudesResultantes:
-                    print("que shoe")
+    
                 mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
                 # mejorSubconjunto.remove(terminoRandom)
                 terminoRandom = obtenerElementoRandom(mejorSubconjunto)
