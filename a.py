@@ -6,14 +6,14 @@ nombres_columnas = ["target"]
 for i in range(1, num_columnas + 1):
     nombres_columnas.append(f"x_{i}")
 
-df = pd.read_csv('monk+s+problems/monks-3.test', header=None, sep='\s+', names=nombres_columnas, index_col=False)
+df = pd.read_csv('monk+s+problems/monks-1.test', header=None, sep='\s+', names=nombres_columnas, index_col=False)
 df.columns = nombres_columnas
 
 # Mostrar el DataFrame resultante
 print(df)
 df.drop(df.columns[0], axis=1)
 
-nombreArchivo = 'monk-3-test.csv'
+nombreArchivo = 'monk-1-test.csv'
 
 df.to_csv(nombreArchivo)
 

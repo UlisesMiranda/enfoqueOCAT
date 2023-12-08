@@ -43,13 +43,12 @@ def binarizacion(df: pd.DataFrame, columnTarget):
     return dfBinarizado
 
 def oneHot(df):
-    last_column_name = df.columns[-1]  # Obtener el nombre de la última columna
-    columns_to_encode = df.columns[:-1]  # Seleccionar todas las columnas excepto la última
-    new_df = pd.DataFrame()  # Crear un nuevo DataFrame para almacenar las columnas codificadas
+    last_column_name = df.columns[-1] 
+    columns_to_encode = df.columns[:-1] 
+    new_df = pd.DataFrame() 
 
     for idx, columna in enumerate(columns_to_encode):
         valores_unicos = np.sort(df[columna].unique())
-        print(valores_unicos)
 
         for valor in valores_unicos:
             nueva_columna = []
@@ -58,9 +57,9 @@ def oneHot(df):
                     nueva_columna.append(1)
                 else:
                     nueva_columna.append(0)
-            new_df[f'{columna}_{valor}'] = nueva_columna  # Agregar nuevas columnas con nombres 'x_1_1', 'x_1_2', etc.
+            new_df[f'{columna}_{valor}'] = nueva_columna
     
-    # new_df[last_column_name] = df[last_column_name]  # Agregar la última columna original al nuevo DataFrame
+    new_df[last_column_name] = df[last_column_name] 
     
     return new_df
 
@@ -69,6 +68,21 @@ def indicesPositivosAndNegativos(columna: np.array, target):
     neg = np.where(columna != target)
     
     return pos, neg
+
+def obtenerIndicePorColumna(espacio: pd.DataFrame, columnas, target):
+    indicesPositivosXcolumna = []
+    
+    for col in columnas:
+        if col.startswith('neg_'):
+            col_normal = col[4:]
+            columnaActual = espacio[col_normal].values
+            pos = np.where(columnaActual != target)
+            indicesPositivosXcolumna.append([col, pos[0]])  
+        else:
+            columnaActual = espacio[col].values
+            pos = np.where(columnaActual == target)
+            indicesPositivosXcolumna.append([col, pos[0]])  
+    return indicesPositivosXcolumna
 
 def obtenerIndices(espacio: pd.DataFrame, columnas, target):
     indicesPositivosXcolumna = []
@@ -99,6 +113,17 @@ def calcularMagnitud(listaIndices):
         
     return magnitudesIndices
 
+def calculoAptitudesParcial(positivosAceptadosMagnitud: list, negativosAceptadosMagnitud: list, columnas: list): 
+    aptitudesResultantes = []
+    for i, col in enumerate(columnas):
+        magnitudPositivosAceptados = positivosAceptadosMagnitud[i][1]
+        magnitudNegativosAceptados = negativosAceptadosMagnitud[i][1]
+        
+        aptitudValor = aptitud(magnitudPositivosAceptados, magnitudNegativosAceptados)
+        aptitudesResultantes.append((col, aptitudValor))
+        
+    return sorted(aptitudesResultantes, key=lambda x: x[1], reverse=True)
+
 def calculoAptitudes(positivosAceptadosMagnitud: list, positivosAceptadosNegadosMagnitud: list,
                      negativosAceptadosMagnitud: list, negativosAceptadosNegadosMagnitud: list, columnas: list) -> list:
     
@@ -120,12 +145,25 @@ def calculoAptitudes(positivosAceptadosMagnitud: list, positivosAceptadosNegados
     return sorted(aptitudesResultantes, key=lambda x: x[1], reverse=True)
 
 def obtenerMejoresCandidatos(aptitudesResultantes: list):
+    aptitudesResultantes.sort(key=lambda x: x[1], reverse=True)
+    
     aptitudMasAlta = aptitudesResultantes[0][1]
 
-    # Filtrar las tuplas que tienen el número más alto del segundo valor
     mejorSubconjunto = [tupla[0] for tupla in aptitudesResultantes if tupla[1] == aptitudMasAlta]
     
+    siguientesMejores = []
+    count = 0
+    for tupla in aptitudesResultantes:
+        # defino el numero m de cuantos mejores
+        if tupla[1] < aptitudMasAlta and count < 2:
+            siguientesMejores.append(tupla[0])
+            count += 1
+    
+    if siguientesMejores:
+        mejorSubconjunto.extend(siguientesMejores)
+    
     return mejorSubconjunto
+
 
 def obtenerElementoRandom(lista: list):
     return random.choice(lista)
@@ -175,24 +213,20 @@ def filter_non_conforming_rows_disyuncion(rules, df):
     non_conforming_rows = []
 
     for index, row in df.iterrows():
-        satisfies_all_rules = True  # Para la conjunción de reglas
+        satisfies_all_rules = True 
         for rule in rules:
-            # Separar la regla en elementos
             elements = rule.split(' v ')
-            satisfies_any_rule = False  # Para la disyunción de elementos dentro de una regla
+            satisfies_any_rule = False  
             for term in elements:
-                # Verificar si al menos un elemento de la regla se cumple en la fila
                 element_satisfied = eval(term, row)
                 if element_satisfied:
                     satisfies_any_rule = True
                     break
             
-            # Si alguno de los elementos de la regla no se cumple, la regla completa no se cumple
             if not satisfies_any_rule:
                 satisfies_all_rules = False
                 break
         
-        # Si la fila cumple con todas las reglas, agregarla a la lista de filas no conformes
         if satisfies_all_rules:
             non_conforming_rows.append(row)
 
@@ -204,39 +238,32 @@ def evaluate_rules(rules, df_test:pd.DataFrame, columnTarget):
     y_true = []
 
     for index, row in df_test.iterrows():
-        satisfies_all_rules = True  # Para la conjunción de reglas
+        satisfies_all_rules = True 
         
         for rule in rules:
-            # Separar la regla en elementos
             elements = rule.split(' v ')
-            satisfies_any_rule = False  # Para la disyunción de elementos dentro de una regla
+            satisfies_any_rule = False 
             for term in elements:
-                # Verificar si al menos un elemento de la regla se cumple en la fila
                 element_satisfied = eval(term, row)
                 if element_satisfied:
                     satisfies_any_rule = True
                     break
             
-            # Si alguno de los elementos de la regla no se cumple, la regla completa no se cumple
             if not satisfies_any_rule:
                 satisfies_all_rules = False
                 break
         
-        # Generar predicción y y_true
         prediction = '1' if satisfies_all_rules else '0'
         predictions.append(prediction)
-        y_true.append(row[columnTarget])  # Reemplaza 'target_column' con tu columna objetivo
+        y_true.append(row[columnTarget])
 
     return predictions, y_true
 
-# Función para evaluar cada término de la regla en la fila correspondiente
 def eval(term, row):
-    # Split para obtener las columnas y su negación
     columns = term.split(' ')
     for col in columns:
-        # Verificar si la columna está negada
         if col.startswith('neg_'):
-            col = col[4:]  # Eliminar el prefijo 'neg_'
+            col = col[4:]  
             if row[col] == '1':
                 return False
         else:
@@ -252,43 +279,34 @@ def extract_non_conforming_rows_conjuncion(rules, df):
         satisfies_any_rule = False
 
         for rule in rules:
-            # Separar la regla en elementos de la conjunción
             elements = rule.split(' ^ ')
             satisfies_all_elements = True
 
             for element in elements:
-                # Verificar si cada elemento de la conjunción se cumple en la fila
                 if not eval_element_conjuncion(element, row):
                     satisfies_all_elements = False
                     break
             
-            # Si todos los elementos de la conjunción se cumplen, la regla se cumple
             if satisfies_all_elements:
                 satisfies_any_rule = True
                 break
 
-        # Si ninguna regla se cumple para la fila, agregarla a las no conformes
         if satisfies_any_rule:
             non_conforming_rows.append(row)
 
     non_conforming_df = pd.DataFrame(non_conforming_rows)
     return non_conforming_df
 
-# Función para evaluar cada elemento de la conjunción en la fila correspondiente
 def eval_element_conjuncion(element, row):
-    # Separar los términos de la disyunción
     terms = element.split(' v ')
 
-    # Verificar si al menos uno de los términos se cumple en la fila
     for term in terms:
         if eval_conjuncion(term, row):
             return True
     
     return False
 
-# Función para evaluar cada término de la regla en la fila correspondiente
 def eval_conjuncion(term, row):
-    # Si el término comienza con 'neg_', considera la negación
     if term.startswith('neg_'):
         col_name = term[4:]
         return not bool(int(row[col_name]))
@@ -303,22 +321,18 @@ def evaluate_rules_conjuncion(rules, df, columnTarget):
         satisfies_any_rule = False
 
         for rule in rules:
-            # Separar la regla en elementos de la conjunción
             elements = rule.split(' ^ ')
             satisfies_all_elements = True
 
             for element in elements:
-                # Verificar si cada elemento de la conjunción se cumple en la fila
                 if not eval_element_conjuncion(element, row):
                     satisfies_all_elements = False
                     break
             
-            # Si todos los elementos de la conjunción se cumplen, la regla se cumple
             if satisfies_all_elements:
                 satisfies_any_rule = True
                 break
 
-        # Asignar valor a la predicción
         prediction = '1' if satisfies_any_rule else '0'
         predictions.append(prediction)
         
@@ -339,7 +353,7 @@ def generarNuevaRepresentacionDf(df):
         
     lista_dataframes.append(df[[df.columns[-1]]])
     dfBinarizado =pd.concat(lista_dataframes, axis=1)
-    print(dfBinarizado)
+    # print(dfBinarizado)
     
     return dfBinarizado
 
@@ -375,6 +389,8 @@ def calcularMatrizConfusion(y_true, y_pred, targetClass):
     print("Sensibilidad (Recall):", recall)
     print("Precisión (Precision):", precision)
     print("Puntuación F1 (F1-score):", f1_score)
+    
+    return accuracy
 
 def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
     columnas = list(df.columns)
@@ -417,18 +433,37 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
                     terminoRandomCopy = terminoRandom
                     if terminoRandom.startswith('neg_'):
                         terminoRandomCopy = terminoRandom[4:]
+                    
+                    if mejorSubconjunto:
                         
-                    positivosAceptados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, positivosAceptados))      
-                    positivosAceptadosNegados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, positivosAceptadosNegados))      
-                    negativosAceptados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, negativosAceptados))      
-                    negativosAceptadosNegados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, negativosAceptadosNegados))
-                    
-                    columnasEvaluacion.remove(terminoRandomCopy) 
-                    
-                    positivosAceptadosMagnitud = calcularMagnitud(positivosAceptados)
-                    positivosAceptadosNegadosMagnitud = calcularMagnitud(positivosAceptadosNegados)
-                    negativosAceptadosMagnitud = calcularMagnitud(negativosAceptados)
-                    negativosAceptadosNegadosMagnitud = calcularMagnitud(negativosAceptadosNegados)     
+                        pos_xi = obtenerIndicePorColumna(conceptosPositivosActual, mejorSubconjunto, target)
+                        neg_xi = obtenerIndicePorColumna(conceptosNegativosActual, mejorSubconjunto, target)
+                        
+                        positivosAceptadosMagnitud = calcularMagnitud(pos_xi)
+                        negativosAceptadosMagnitud = calcularMagnitud(neg_xi)
+                        
+                        positivosAceptadosNegadosMagnitud = []
+                        negativosAceptadosNegadosMagnitud = []
+                        
+                        aptitudesResultantes: list = calculoAptitudesParcial(positivosAceptadosMagnitud, negativosAceptadosMagnitud, mejorSubconjunto)
+                
+                        mejorSubconjunto = obtenerMejoresCandidatos(aptitudesResultantes)
+                        
+                    if not mejorSubconjunto:
+                        positivosAceptados, positivosAceptadosNegados = obtenerIndices(conceptosPositivosActual, columnasEvaluacion, target)
+                        negativosAceptados, negativosAceptadosNegados = obtenerIndices(conceptosNegativosActual, columnasEvaluacion, target)
+                            
+                        positivosAceptados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, positivosAceptados))      
+                        positivosAceptadosNegados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, positivosAceptadosNegados))      
+                        negativosAceptados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, negativosAceptados))      
+                        negativosAceptadosNegados = list(filter(lambda tupla: tupla[0] != terminoRandomCopy, negativosAceptadosNegados))
+                        
+                        columnasEvaluacion.remove(terminoRandomCopy) 
+                        
+                        positivosAceptadosMagnitud = calcularMagnitud(positivosAceptados)
+                        positivosAceptadosNegadosMagnitud = calcularMagnitud(positivosAceptadosNegados)
+                        negativosAceptadosMagnitud = calcularMagnitud(negativosAceptados)
+                        negativosAceptadosNegadosMagnitud = calcularMagnitud(negativosAceptadosNegados)     
             
             if mejorSubconjunto:
                 terminoRandom = obtenerElementoRandom(mejorSubconjunto)
@@ -484,20 +519,18 @@ def enfoqueOCAT(df: pd.DataFrame, columnTarget, target):
     return clausulaGeneral
 
 
-# PRUEBA DE DATOS
+# PRUEBA DE DATOS EJEMPLO
 columna_1 = [0,1,0,1,1,0,1,0,1,1]
 columna_2 = [1,1,0,0,0,0,1,0,0,1]
 columna_3 = [0,0,1,0,1,0,1,0,0,1]
 columna_4 = [0,0,1,1,0,1,1,0,0,0]
 columna_5 = [1,1,1,1,0,0,0,0,0,0]
-# # Convertir las listas de enteros a listas de strings
 columna_1_str = [str(x) for x in columna_1]
 columna_2_str = [str(x) for x in columna_2]
 columna_3_str = [str(x) for x in columna_3]
 columna_4_str = [str(x) for x in columna_4]
 columna_5_str = [str(x) for x in columna_5]
 
-# Crear un DataFrame con esas columnas como strings
 dfBinarizado = pd.DataFrame({
     'x_1': columna_1_str,
     'x_2': columna_2_str,
@@ -517,7 +550,9 @@ y_pred, y_true = evaluate_rules(hipotesis, dfBinarizado, columnTarget)
 
 calcularMatrizConfusion(y_true, y_pred, target)
 
-# PROBANDO
+
+# TAREA
+random.seed(9)
 
 for i in range(1, 4):
     print(f"\n----DATASET MONK {i}:")
@@ -533,42 +568,39 @@ for i in range(1, 4):
     df_combinado = pd.concat([df_train, df_test], ignore_index=True)
 
     # Codificar columnas categóricas en one-hot
-    df_encoded = pd.get_dummies(df_combinado, columns=df_train.columns[:-1])
+    # df_encoded = pd.get_dummies(df_combinado, columns=df_train.columns[:-1])
 
-    columnaRemoved = df_encoded.pop(columnTarget)
-    df_encoded[columnTarget] = columnaRemoved
+    # columnaRemoved = df_encoded.pop(columnTarget)
+    # df_encoded[columnTarget] = columnaRemoved
+    
+    df_encoded = oneHot(df_combinado)
 
 
-    # Filtrar las columnas con el formato x_1_1, x_1_2, x_2_1, etc.
     columnas_binarias = [col for col in df_encoded.columns if col.startswith('x_')]
 
-    # Crear nuevas columnas binarias combinando los valores
     for col in columnas_binarias:
         df_encoded[col] = df_encoded[col].apply(lambda x: '1' if x > 0 else '0')
 
-
-    # Dividir nuevamente en df_train y df_test
     df_train_binarizado = df_encoded.iloc[:len(df_train)].astype(str)
     df_test_binarizado = df_encoded.iloc[len(df_train):].astype(str)
 
-    print("TRAIN\n", df_train)
-    print("TEST\n", df_test)
+    # print("TRAIN\n", df_train)
+    # print("TEST\n", df_test)
 
-    # df_train_binarizado = generarNuevaRepresentacionDf(df_train).astype(str)
-    # df_test_binarizado = generarNuevaRepresentacionDf(df_test).astype(str)
+    # # df_train_binarizado = generarNuevaRepresentacionDf(df_train).astype(str)
+    # # df_test_binarizado = generarNuevaRepresentacionDf(df_test).astype(str)
 
-    print("TRAIN bin\n", df_train_binarizado)
-    print("TEST bin\n", df_test_binarizado)
+    # print("TRAIN bin\n", df_train_binarizado)
+    # print("TEST bin\n", df_test_binarizado)
 
     hipotesis = enfoqueOCAT(df_train_binarizado, columnTarget, target)
 
     y_pred, y_true = evaluate_rules(hipotesis, df_test_binarizado, columnTarget)
     # y_pred, y_true = evaluate_rules_conjuncion(hipotesis, df_test_binarizado, columnTarget)
 
-    calcularMatrizConfusion(y_true, y_pred, target)
+    acc = calcularMatrizConfusion(y_true, y_pred, target)       
 
 
 
 
-
-        
+    
